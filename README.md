@@ -23,37 +23,37 @@ This project implements a **Distributed Multi-Agent Traffic Coordination System*
 
 ```mermaid
 graph TD
-    subgraph "CityFlow Simulation Micro-Engine (C++)"
-        CF[CityFlow Core Simulation]
-        J1_Sim[Junction J1 Simulation]
-        J2_Sim[Junction J2 Simulation]
-        J3_Sim[Junction J3 Central Simulation]
-        J4_Sim[Junction J4 Simulation]
-        J5_Sim[Junction J5 Simulation]
+    subgraph Engine["CityFlow Simulation Engine"]
+        CF["CityFlow Core (C++)"]
+        J1_Sim["Junction J1 Simulation"]
+        J2_Sim["Junction J2 Simulation"]
+        J3_Sim["Junction J3 Central Simulation"]
+        J4_Sim["Junction J4 Simulation"]
+        J5_Sim["Junction J5 Simulation"]
     end
 
-    subgraph "Distributed Multi-Agent Intelligence Layer"
-        Bus((Distributed Message Bus))
-        A1[Agent-J1: West Node] <--> Bus
-        A2[Agent-J2: North Node] <--> Bus
-        A3[Agent-J3: Central Hub] <--> Bus
-        A4[Agent-J4: East Node] <--> Bus
-        A5[Agent-J5: South Node] <--> Bus
+    subgraph Intelligence["Distributed Multi-Agent Layer"]
+        Bus(("Distributed Message Bus"))
+        A1["Agent-J1: West Node"] <--> Bus
+        A2["Agent-J2: North Node"] <--> Bus
+        A3["Agent-J3: Central Hub"] <--> Bus
+        A4["Agent-J4: East Node"] <--> Bus
+        A5["Agent-J5: South Node"] <--> Bus
     end
 
-    subgraph "Orchestration & Central Server (Flask)"
-        SRV[Flask Backend: server.py]
-        API_STATE[/api/state]
-        API_INCIDENT[/api/incident]
-        API_AMB[/api/ambulance]
-        API_CTRL[/api/control]
+    subgraph Server["Central Orchestrator (Flask)"]
+        SRV["Flask Backend: server.py"]
+        API_STATE["Endpoint: /api/state"]
+        API_INCIDENT["Endpoint: /api/incident"]
+        API_AMB["Endpoint: /api/ambulance"]
+        API_CTRL["Endpoint: /api/control"]
     end
 
-    subgraph "Real-Time SUMO-Style 2D Frontend"
-        CANVAS[Fullscreen 2D Canvas Renderer]
-        HUD[Live Telemetry HUD]
-        DRAWER[Interactive Diagnostic Drawer]
-        DASH[Central City Control Grid Modal]
+    subgraph Frontend["SUMO-Style 2D Frontend"]
+        CANVAS["Fullscreen 2D Canvas Renderer"]
+        HUD["Live Telemetry HUD"]
+        DRAWER["Interactive Diagnostic Drawer"]
+        DASH["Central Control Grid Modal"]
     end
 
     CF --> SRV
