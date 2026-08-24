@@ -74,18 +74,18 @@ Each junction agent executes an **Observe ➔ Communicate ➔ Decide ➔ Act** c
 For every incoming lane $l \in \{\text{North}, \text{South}, \text{East}, \text{West}\}$:
 $$\text{Density}_l = \min\left(1.0, \frac{\text{Vehicle Count}_l}{\text{Lane Capacity}_l}\right)$$
 $$\text{Queue Score}_l = \min\left(1.0, \frac{\text{Waiting Vehicles}_l}{\text{Lane Capacity}_l}\right)$$
-$$\text{Waiting Score}_l = \min\left(1.0, \frac{\text{Starvation Wait Time}_l}{\text{Starvation Limit}}\right)$$
+$$\text{Waiting Score}_l = \min\left(1.0, \frac{\text{Wait Time}_l}{T_{\text{starve}}}\right)$$
 
 The directional congestion score is computed as:
-$$\text{Congestion Score}_m = 0.50 \times \text{Density}_m + 0.30 \times \text{Queue Score}_m + 0.20 \times \text{Waiting Score}_m$$
+$$\text{Congestion Score}_m = 0.50 \cdot \text{Density}_m + 0.30 \cdot \text{Queue Score}_m + 0.20 \cdot \text{Waiting Score}_m$$
 
 ---
 
 ### 2. Downstream Capacity-Aware Priority
 Rather than greedily clearing the largest local queue, each agent queries the downstream neighbor agent to check if the next intersection can absorb outgoing vehicles:
-$$\text{Downstream Capacity Factor} = 1.0 - \text{Downstream Density}_{\text{neighbor}}$$
+$$\text{Capacity Factor} = 1.0 - \text{Density}_{\text{downstream}}$$
 
-$$\text{Priority}_m = \text{Congestion Score}_m \times \text{Downstream Capacity Factor}$$
+$$\text{Priority}_m = \text{Congestion Score}_m \times \text{Capacity Factor}$$
 
 > **Core Principle:** If neighbor junction $B$ is congested ($\text{Density} = 85\%$), upstream junction $A$ reduces green time toward $B$, preventing cascading gridlock.
 
@@ -93,16 +93,16 @@ $$\text{Priority}_m = \text{Congestion Score}_m \times \text{Downstream Capacity
 
 ### 3. Dynamic Bounded Green Timing
 To guarantee traffic stability and eliminate high-frequency signal flickering:
-$$\text{Green Time} = \text{MIN\_GREEN} + \text{Priority} \times (\text{MAX\_GREEN} - \text{MIN\_GREEN})$$
-* $\text{MIN\_GREEN} = 12\text{s}$
-* $\text{MAX\_GREEN} = 45\text{s}$
-* $\text{YELLOW\_CLEARANCE} = 3\text{s}$
+$$\text{Green Duration} = T_{\min} + \text{Priority} \times (T_{\max} - T_{\min})$$
+* **$T_{\min}$ (Min Green Time)** $= 12\text{s}$
+* **$T_{\max}$ (Max Green Time)** $= 45\text{s}$
+* **$T_{\text{yellow}}$ (Yellow Transition)** $= 3\text{s}$
 
 ---
 
 ### 4. Anti-Starvation Protection
-If an unserved direction has been waiting for more than $\text{STARVATION\_LIMIT} = 40\text{s}$, a priority escalation boost is injected:
-$$\text{Priority}_{\text{boost}} = \min\left(0.6, \frac{\text{Wait Time} - 40}{40} \times 0.5\right)$$
+If an unserved direction has been waiting for more than $T_{\text{starve}} = 40\text{s}$, a priority escalation boost is injected:
+$$\text{Priority}_{\text{boost}} = \min\left(0.6, \frac{\text{Wait Time} - T_{\text{starve}}}{T_{\text{starve}}} \times 0.5\right)$$
 
 ---
 
