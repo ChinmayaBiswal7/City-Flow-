@@ -44,7 +44,6 @@ class TrafficAgent:
         self.last_decision_reason = "System Initialized."
         self.incidents: Dict[str, Any] = {}
         self.emergency_override: Optional[str] = None
-        self.incident_override_phase: Optional[str] = None
         self.step_counter = 0
 
     def observe(self, vehicle_info_map: Dict[str, Any]) -> Dict[str, Any]:
@@ -118,6 +117,15 @@ class TrafficAgent:
         obs = self.local_obs.get(phase_name, {})
         local_cong = obs.get("congestion_score", 0.0)
 
+        # Check if an incident is active on any outgoing road for this phase
+        incident_penalty = 1.0
+        for inc in self.incidents.values():
+            if inc.get("active"):
+                inc_road = inc.get("road", "")
+                # If accident is on road_J3_J2 (outgoing North road), penalize NS phase at J3
+                if "J3_J2" in inc_road and phase_name == "NS" and self.junction_id == "J3":
+                    incident_penalty = 0.08
+
         neighbor_id = self.outgoing_neighbors.get(phase_name)
         downstream_density = 0.0
 
@@ -125,7 +133,7 @@ class TrafficAgent:
             n_data = neighbor_states[neighbor_id]
             downstream_density = n_data.get("overall_density", 0.0)
 
-        downstream_cap_factor = max(0.20, 1.0 - downstream_density)
+        downstream_cap_factor = max(0.20, 1.0 - downstream_density) * incident_penalty
         priority = local_cong * downstream_cap_factor
 
         wait_time = obs.get("waiting_time", 0)
@@ -157,18 +165,7 @@ class TrafficAgent:
 
         self.steps_on_phase += 1
 
-        # 1. Check Active Incident Override (Highest Precedence)
-        if self.incident_override_phase:
-            target_phase_name = self.incident_override_phase
-            target_idx = self.phase_names.index(target_phase_name) if target_phase_name in self.phase_names else 0
-            if self.current_phase != target_idx:
-                self._initiate_switch(target_idx, 1.0, f"⚠️ Diverting traffic away from incident corridor")
-                return self.last_decision_reason
-            else:
-                self.last_decision_reason = f"⚠️ ACCIDENT DIVERSION ACTIVE: Holding {target_phase_name}-Green to bypass blocked link."
-                return self.last_decision_reason
-
-        # 2. Emergency Ambulance Preemption
+        # 1. Emergency Ambulance Preemption (Takes absolute precedence)
         if self.emergency_override:
             target_phase_name = self.emergency_override
             target_idx = self.phase_names.index(target_phase_name) if target_phase_name in self.phase_names else 0
@@ -179,7 +176,7 @@ class TrafficAgent:
                 self.last_decision_reason = "🚨 Holding GREEN for Ambulance Corridor."
                 return self.last_decision_reason
 
-        # 3. Standard Multi-Agent Adaptive Control
+        # 2. Autonomous Multi-Agent Adaptive Control
         priorities = {}
         for p in self.phase_names:
             priorities[p] = self.compute_priority(p, neighbor_states)
@@ -192,10 +189,16 @@ class TrafficAgent:
         cur_priority = priorities.get(cur_phase_name, 0.0)
         other_priority = priorities.get(other_phase_name, 0.0)
 
+        # If an active incident is on our outgoing link, notify in reason
+        active_inc = [i for i in self.incidents.values() if i.get("active")]
+        incident_note = ""
+        if active_inc:
+            incident_note = f" [⚠️ Blockade on {active_inc[0].get('road')}]"
+
         # Minimum green constraint
         if self.steps_on_phase < self.MIN_GREEN:
             remaining_min = self.MIN_GREEN - self.steps_on_phase
-            self.last_decision_reason = f"Holding {cur_phase_name}-Green (Min hold: {remaining_min}s left)."
+            self.last_decision_reason = f"Holding {cur_phase_name}-Green (Min hold: {remaining_min}s left){incident_note}."
             return self.last_decision_reason
 
         # Maximum green constraint
@@ -214,9 +217,9 @@ class TrafficAgent:
             return self.last_decision_reason
 
         # Adaptive switch
-        if other_priority > cur_priority * self.SWITCH_RATIO and other_priority > 0.18:
+        if other_priority > cur_priority * self.SWITCH_RATIO and other_priority > 0.15:
             neighbor = self.outgoing_neighbors.get(cur_phase_name)
-            reason = f"Higher load on {other_phase_name} (P={other_priority} vs {cur_priority})"
+            reason = f"Higher load on {other_phase_name} (P={other_priority} vs {cur_priority}){incident_note}"
             if neighbor and neighbor in neighbor_states:
                 n_cap = 1.0 - neighbor_states[neighbor].get("overall_density", 0.0)
                 reason += f" · Neighbor {neighbor} cap={int(n_cap*100)}%"
@@ -224,7 +227,7 @@ class TrafficAgent:
             return self.last_decision_reason
 
         self.last_decision_reason = (
-            f"Maintaining {cur_phase_name}-Green (P={cur_priority} vs {other_phase_name} P={other_priority})."
+            f"Maintaining {cur_phase_name}-Green (P={cur_priority} vs {other_phase_name} P={other_priority}){incident_note}."
         )
         return self.last_decision_reason
 
@@ -271,19 +274,19 @@ class TrafficAgent:
         }
 
     def set_incident(self, road_id: str, incident_type: str, active: bool = True):
-        self.incidents[road_id] = {
-            "junction": self.junction_id,
-            "road": road_id,
-            "type": incident_type,
-            "active": active,
-            "timestamp": time.time()
-        }
+        if active:
+            self.incidents[road_id] = {
+                "junction": self.junction_id,
+                "road": road_id,
+                "type": incident_type,
+                "active": True,
+                "timestamp": time.time()
+            }
+        else:
+            self.incidents.pop(road_id, None)
 
     def set_emergency(self, phase_name: Optional[str]):
         self.emergency_override = phase_name
-
-    def set_incident_diversion(self, phase_name: Optional[str]):
-        self.incident_override_phase = phase_name
 
     def reset(self):
         self.current_phase = 0
@@ -297,7 +300,6 @@ class TrafficAgent:
         self.priorities = {}
         self.incidents = {}
         self.emergency_override = None
-        self.incident_override_phase = None
         self.last_decision_reason = "Reset Complete."
 
 
@@ -427,19 +429,13 @@ class MultiAgentCoordinator:
                 "type": incident_type,
                 "active": True
             }
-            # When road_J3_J2 (North of J3) is blocked:
-            # 1. J3 locks into EW GREEN (Phase 0) to stop sending cars North into the crash!
-            # 2. J5 locks into EW GREEN to divert South cars onto the outer ring!
-            # 3. J2 locks into EW GREEN to divert North cars onto the outer ring!
-            self.agents["J3"].set_incident_diversion("EW")
-            self.agents["J5"].set_incident_diversion("EW")
-            self.agents["J2"].set_incident_diversion("EW")
-            self.agents["J1"].set_incident_diversion(None)
-            self.agents["J4"].set_incident_diversion(None)
+            # Notify the local agent J3 of the incident on road_J3_J2
+            if junction_id in self.agents:
+                self.agents[junction_id].set_incident(road_id, incident_type, True)
         else:
             self.active_incidents.pop(road_id, None)
-            for ag in self.agents.values():
-                ag.set_incident_diversion(None)
+            if junction_id in self.agents:
+                self.agents[junction_id].set_incident(road_id, incident_type, False)
 
     def reset(self):
         for agent in self.agents.values():

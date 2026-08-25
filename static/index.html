@@ -945,7 +945,7 @@
         }
       });
 
-      // 3. Draw Active Accident Scene & Blockade
+      // 3. Draw Active Accident Scene & Blockade on the specific blocked lane
       incidents.forEach(inc => {
         if (!inc.active) return;
         const g = roadGeom[inc.road];
@@ -955,13 +955,20 @@
         const wy = (g.p1.y + g.p2.y) / 2;
         const sc = worldToScreen(wx, wy);
 
+        const offsetPx = 8 * view.scale;
+        const offX = -Math.sin(g.angle) * offsetPx;
+        const offY = Math.cos(g.angle) * offsetPx;
+
+        const ax = sc.x + offX;
+        const ay = sc.y + offY;
+
         ctx.save();
-        ctx.translate(sc.x, sc.y);
+        ctx.translate(ax, ay);
 
         const flash = Math.floor(Date.now() / 250) % 2 === 0;
         ctx.fillStyle = flash ? 'rgba(239, 68, 68, 0.4)' : 'rgba(234, 179, 8, 0.4)';
         ctx.beginPath();
-        ctx.arc(0, 0, 16 * view.scale, 0, Math.PI * 2);
+        ctx.arc(0, 0, 14 * view.scale, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.fillStyle = '#f97316';
