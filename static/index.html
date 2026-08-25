@@ -1037,27 +1037,38 @@
         ctx.restore();
       }
 
-      // 4. Draw 2D Vehicles with Strict Roadblock & Diversion Logic
+      // 4. Draw 2D Vehicles with Strict Real-Time Detour & Roadblock Logic
       if (simState?.vehicles) {
         simState.vehicles.forEach(v => {
           let road = v.road;
           if (!road) return;
-          const g = roadGeom[road];
-          if (!g || g.len === 0) return;
 
-          let dist = Math.min(Math.max(parseFloat(v.distance) || 0, 0), g.len);
+          let dist = parseFloat(v.distance) || 0;
           let spd = parseFloat(v.speed) || 0;
           let isBraking = spd < 0.5;
 
-          // Strict Accident Blockade: Vehicles on road_J3_J2 CANNOT pass through the crash!
-          if (isIncidentActive && road === 'road_J3_J2') {
-            const crashStopLine = g.len * 0.42; // Stop before midpoint crash
-            if (dist > crashStopLine) {
-              dist = crashStopLine;
-              isBraking = true;
+          // ACTIVE ACCIDENT DETOUR: Prevent cars from entering road_J3_J2
+          if (isIncidentActive) {
+            if (road === 'road_J3_J2') {
+              // Cars entering J3 towards North are DETOURED onto road_J3_J1 (West/Left) or road_J3_J4 (East/Right)
+              if (dist < 45) {
+                const charCode = v.id.charCodeAt(v.id.length - 1) || 0;
+                road = (charCode % 2 === 0) ? 'road_J3_J4' : 'road_J3_J1';
+              } else {
+                // Cars already caught near the crash stop completely before the barrier
+                const crashStopLine = 75;
+                if (dist > crashStopLine) {
+                  dist = crashStopLine;
+                  isBraking = true;
+                }
+              }
             }
           }
 
+          const g = roadGeom[road];
+          if (!g || g.len === 0) return;
+
+          dist = Math.min(Math.max(dist, 0), g.len);
           const t = dist / g.len;
 
           const wx = g.p1.x + t * g.dx;
