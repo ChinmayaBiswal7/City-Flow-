@@ -998,15 +998,66 @@
         ctx.restore();
       });
 
-      // 4. Draw 2D Vehicles
+      // 3b. Draw J3 North Exit Barricade & Detour Signage during Active Accident
+      if (isIncidentActive && intersections['J3']) {
+        const j3sc = worldToScreen(intersections['J3'].point.x, intersections['J3'].point.y);
+        
+        // No Entry Barricade at North Exit of J3
+        ctx.save();
+        ctx.translate(j3sc.x + (8 * view.scale), j3sc.y - (18 * view.scale));
+        
+        // Red/White Striped Barricade
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(-10 * view.scale, -2 * view.scale, 20 * view.scale, 4 * view.scale);
+        ctx.fillStyle = '#ffffff';
+        for (let i = -8; i <= 8; i += 4) {
+          ctx.fillRect(i * view.scale, -2 * view.scale, 2 * view.scale, 4 * view.scale);
+        }
+        
+        // No Entry Round Sign
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.arc(0, -7 * view.scale, 5 * view.scale, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-3 * view.scale, -8 * view.scale, 6 * view.scale, 2 * view.scale);
+        
+        ctx.restore();
+
+        // Glowing Detour Signage at J3 (Pointing Left to J1 and Right to J4)
+        ctx.save();
+        ctx.translate(j3sc.x, j3sc.y + (28 * view.scale));
+        ctx.fillStyle = '#22c55e';
+        ctx.shadowColor = '#22c55e';
+        ctx.shadowBlur = 8;
+        ctx.font = `bold ${8 * view.scale}px sans-serif`;
+        ctx.textAlign = 'center';
+        ctx.fillText('⬅️ DETOUR VIA J1 & J4 ➡️', 0, 0);
+        ctx.shadowBlur = 0;
+        ctx.restore();
+      }
+
+      // 4. Draw 2D Vehicles with Strict Roadblock & Diversion Logic
       if (simState?.vehicles) {
         simState.vehicles.forEach(v => {
-          const road = v.road;
+          let road = v.road;
           if (!road) return;
           const g = roadGeom[road];
           if (!g || g.len === 0) return;
 
-          const dist = Math.min(Math.max(parseFloat(v.distance) || 0, 0), g.len);
+          let dist = Math.min(Math.max(parseFloat(v.distance) || 0, 0), g.len);
+          let spd = parseFloat(v.speed) || 0;
+          let isBraking = spd < 0.5;
+
+          // Strict Accident Blockade: Vehicles on road_J3_J2 CANNOT pass through the crash!
+          if (isIncidentActive && road === 'road_J3_J2') {
+            const crashStopLine = g.len * 0.42; // Stop before midpoint crash
+            if (dist > crashStopLine) {
+              dist = crashStopLine;
+              isBraking = true;
+            }
+          }
+
           const t = dist / g.len;
 
           const wx = g.p1.x + t * g.dx;
@@ -1019,9 +1070,6 @@
 
           const vx = sc.x + offX;
           const vy = sc.y + offY;
-
-          const spd = parseFloat(v.speed) || 0;
-          const isBraking = spd < 0.5;
 
           const vehColor = hashColor(v.id);
 
