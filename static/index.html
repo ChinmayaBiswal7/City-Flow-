@@ -185,7 +185,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.15s ease-in-out;
     }
     .btn:hover {
       background: rgba(255, 255, 255, 0.16);
@@ -198,13 +198,21 @@
     .btn-danger { background: rgba(239, 68, 68, 0.25); border-color: rgba(239, 68, 68, 0.6); color: #fca5a5; }
     .btn-danger:hover { background: rgba(239, 68, 68, 0.45); }
     .btn-amber { background: rgba(234, 179, 8, 0.2); border-color: rgba(234, 179, 8, 0.5); color: #fde047; }
+    .btn-amber:hover { background: rgba(234, 179, 8, 0.35); }
     .btn-purple { background: rgba(168, 85, 247, 0.2); border-color: rgba(168, 85, 247, 0.5); color: #e9d5ff; }
+    .btn-purple:hover { background: rgba(168, 85, 247, 0.35); }
 
     .btn-active-incident {
-      background: #b91c1c !important;
+      background: #dc2626 !important;
       border-color: #f87171 !important;
-      color: #fff !important;
-      box-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+      color: #ffffff !important;
+      box-shadow: 0 0 16px rgba(239, 68, 68, 0.6);
+      animation: pulseRed 1.2s infinite;
+    }
+
+    @keyframes pulseRed {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.04); }
     }
 
     .speed-slider-wrap {
@@ -237,7 +245,7 @@
       display: none;
       flex-direction: column;
       overflow: hidden;
-      animation: slideIn 0.25s ease-out;
+      animation: slideIn 0.2s ease-out;
     }
     .node-drawer.active { display: flex; }
 
@@ -294,7 +302,7 @@
       align-items: center;
       justify-content: center;
       font-size: 18px;
-      transition: all 0.3s;
+      transition: background 0.3s, box-shadow 0.3s;
     }
     .sig-green { background: #15803d; box-shadow: 0 0 16px #22c55e88; color: #fff; }
     .sig-yellow { background: #a16207; box-shadow: 0 0 16px #eab30888; color: #fff; }
@@ -327,7 +335,7 @@
     .dir-bar-fill {
       height: 100%;
       border-radius: 3px;
-      transition: width 0.3s ease;
+      transition: width 0.25s ease;
     }
     .dir-stats {
       display: grid;
@@ -359,11 +367,8 @@
       display: none;
       align-items: center;
       justify-content: center;
-      animation: fadeIn 0.2s ease-out;
     }
     .modal-backdrop.active { display: flex; }
-
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
     .modal-content {
       width: 90%;
@@ -403,7 +408,7 @@
       border-radius: 12px;
       padding: 14px;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.15s ease;
     }
     .agent-summary-card:hover {
       border-color: var(--accent-blue);
@@ -559,13 +564,46 @@
 
       <div>
         <div class="section-lbl">Lane-by-Lane Congestion & Density</div>
-        <div class="dir-grid" id="drw-dir-list"></div>
+        <div class="dir-grid" id="drw-dir-list">
+          <!-- Static Stable Cards (EW & NS) -->
+          <div class="dir-card" id="dir-card-EW">
+            <div class="dir-card-head">
+              <span>EW Approach</span>
+              <span id="dir-EW-status" style="color:#22c55e;">LOW (0%)</span>
+            </div>
+            <div class="dir-bar-track">
+              <div class="dir-bar-fill" id="dir-EW-bar" style="width:0%; background:#22c55e;"></div>
+            </div>
+            <div class="dir-stats">
+              <div><span>Queue</span><b id="dir-EW-queue">0</b></div>
+              <div><span>Speed</span><b id="dir-EW-speed">0.0</b></div>
+              <div><span>Score</span><b id="dir-EW-score">0.0</b></div>
+              <div><span>Wait</span><b id="dir-EW-wait">0s</b></div>
+            </div>
+          </div>
+
+          <div class="dir-card" id="dir-card-NS">
+            <div class="dir-card-head">
+              <span>NS Approach</span>
+              <span id="dir-NS-status" style="color:#22c55e;">LOW (0%)</span>
+            </div>
+            <div class="dir-bar-track">
+              <div class="dir-bar-fill" id="dir-NS-bar" style="width:0%; background:#22c55e;"></div>
+            </div>
+            <div class="dir-stats">
+              <div><span>Queue</span><b id="dir-NS-queue">0</b></div>
+              <div><span>Speed</span><b id="dir-NS-speed">0.0</b></div>
+              <div><span>Score</span><b id="dir-NS-score">0.0</b></div>
+              <div><span>Wait</span><b id="dir-NS-wait">0s</b></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div>
         <div class="section-lbl">🤖 Multi-Agent Coordination Logic</div>
         <div class="ai-box" id="drw-ai-reasoning">
-          Evaluating downstream capacity at J4 and J5...
+          Observing traffic flow...
         </div>
       </div>
 
@@ -590,7 +628,9 @@
       </div>
       <div class="modal-body">
         <div class="section-lbl">Active Junction Nodes Telemetry</div>
-        <div class="agent-grid" id="modal-agent-grid"></div>
+        <div class="agent-grid" id="modal-agent-grid">
+          <!-- Populated ONCE at setup -->
+        </div>
 
         <div class="section-lbl">Live Distributed Agent Communication Messages</div>
         <div class="msg-stream" id="modal-msg-stream"></div>
@@ -617,9 +657,9 @@
     let roadGeom = {};
     let intersections = {};
     let selectedJunction = "J3";
-    let incidentActive = false;
+    let isIncidentActive = false;
+    let gridInitialized = false;
 
-    // West-to-East Arterial Corridor Roads for Ambulance Green Wave
     const EW_CORRIDOR_ROADS = new Set([
       'road_VW1_J1', 'road_J1_VW1',
       'road_J1_J3', 'road_J3_J1',
@@ -693,18 +733,43 @@
             lanes: r.lanes.length
           };
         });
+
+        initDashboardGridOnce();
       } catch (err) {}
     }
 
-    // ── Clean SUMO 2D Renderer ──
+    // Build the Dashboard Grid cards ONCE so they never flicker or drop clicks!
+    function initDashboardGridOnce() {
+      if (gridInitialized) return;
+      const grid = document.getElementById('modal-agent-grid');
+      const jids = ['J1', 'J2', 'J3', 'J4', 'J5'];
+      let html = '';
+      jids.forEach(jid => {
+        html += `
+          <div class="agent-summary-card" id="card-${jid}" onclick="selectAndClose('${jid}')">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-weight:700; font-size:14px;">${jid}</span>
+              <span id="ag-phase-${jid}" style="font-size:10px; font-weight:700; color:#22c55e;">EW</span>
+            </div>
+            <div style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:3px;">
+              <div>Density: <b id="ag-dens-${jid}" style="color:#fff;">0%</b></div>
+              <div>Queued: <b id="ag-queue-${jid}" style="color:#fff;">0 cars</b></div>
+              <div>Downstream Cap: <b id="ag-cap-${jid}" style="color:#22c55e;">100%</b></div>
+            </div>
+          </div>
+        `;
+      });
+      grid.innerHTML = html;
+      gridInitialized = true;
+    }
+
+    // ── Clean SUMO 2D Renderer (60 FPS) ──
     function render() {
       ctx.clearRect(0, 0, width, height);
 
-      // Dark asphalt backdrop
       ctx.fillStyle = '#080b11';
       ctx.fillRect(0, 0, width, height);
 
-      // Engineering grid
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.02)';
       ctx.lineWidth = 1;
       const gridSize = 60 * view.scale;
@@ -725,7 +790,7 @@
       const isAmbulanceActive = amb && amb.active;
       const incidents = simState?.active_incidents || [];
 
-      // 1. Draw Clean Asphalt Roads (OR Glowing Emerald Green if Ambulance Corridor is active)
+      // 1. Draw Clean Asphalt Roads (or Glowing Emerald Green Corridor)
       roadnet.roads.forEach(r => {
         const g = roadGeom[r.id];
         if (!g) return;
@@ -745,9 +810,8 @@
 
         const isCorridorRoad = isAmbulanceActive && EW_CORRIDOR_ROADS.has(r.id);
 
-        // Asphalt road surface (or Emerald Green Corridor)
         if (isCorridorRoad) {
-          ctx.strokeStyle = '#15803d'; // Rich Emerald Green
+          ctx.strokeStyle = '#15803d';
           ctx.lineWidth = roadW;
           ctx.lineCap = 'butt';
           ctx.shadowColor = '#22c55e';
@@ -767,7 +831,6 @@
           ctx.stroke();
         }
 
-        // White Lane Curb Borders (or Neon Green border if corridor)
         ctx.strokeStyle = isCorridorRoad ? '#4ade80' : 'rgba(255, 255, 255, 0.16)';
         ctx.lineWidth = isCorridorRoad ? 2.0 : 1.2;
         const borderOff = (roadW / 2);
@@ -781,7 +844,6 @@
         ctx.lineTo(ex - bX, ey - bY);
         ctx.stroke();
 
-        // Dashed Lane Center Line
         ctx.strokeStyle = isCorridorRoad ? '#86efac' : 'rgba(255, 255, 255, 0.3)';
         ctx.lineWidth = 1;
         ctx.setLineDash([8 * view.scale, 8 * view.scale]);
@@ -791,7 +853,6 @@
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Direction Arrows
         const mx = (sx + ex) / 2;
         const my = (sy + ey) / 2;
         ctx.save();
@@ -805,7 +866,7 @@
         ctx.restore();
       });
 
-      // 2. Draw Intersections (Zebra Crossings + Dynamic Stop Bars)
+      // 2. Draw Intersections
       roadnet.intersections.forEach(j => {
         const sc = worldToScreen(j.point.x, j.point.y);
         const jSize = (j.virtual ? 14 : 36) * view.scale;
@@ -816,7 +877,6 @@
           const isEWGreen = phInfo?.phase_idx === 0;
           const isYellow = phInfo?.is_yellow;
 
-          // Junction Asphalt Core
           ctx.fillStyle = (isAmbulanceActive && (j.id === 'J1' || j.id === 'J3' || j.id === 'J4')) ? '#064e3b' : '#141824';
           ctx.strokeStyle = selectedJunction === j.id ? 'rgba(56, 189, 248, 0.85)' : 'rgba(255, 255, 255, 0.15)';
           ctx.lineWidth = selectedJunction === j.id ? 2.5 : 1.5;
@@ -825,7 +885,6 @@
           ctx.fill();
           ctx.stroke();
 
-          // SUMO Zebra Crosswalks
           const armLen = jSize / 2;
           const zebraW = 5 * view.scale;
 
@@ -848,7 +907,6 @@
           drawZebra(sc.x, sc.y - armLen - 4, 0);
           drawZebra(sc.x, sc.y + armLen + 4, 0);
 
-          // Dynamic Traffic Light Stop Bars
           function drawStopBar(bx, by, ang, isGreen) {
             ctx.save();
             ctx.translate(bx, by);
@@ -867,14 +925,12 @@
           drawStopBar(sc.x, sc.y - armLen - 1, 0, !isEWGreen);
           drawStopBar(sc.x, sc.y + armLen + 1, 0, !isEWGreen);
 
-          // Junction Label
           ctx.fillStyle = '#f8fafc';
           ctx.font = `bold ${10 * view.scale}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(j.id, sc.x, sc.y);
 
-          // Active Phase text
           const tagCol = isYellow ? '#eab308' : isEWGreen ? '#22c55e' : '#38bdf8';
           ctx.font = `bold ${8 * view.scale}px sans-serif`;
           ctx.fillStyle = tagCol;
@@ -895,7 +951,6 @@
         const g = roadGeom[inc.road];
         if (!g) return;
 
-        // Place accident at midpoint of blocked road
         const wx = (g.p1.x + g.p2.x) / 2;
         const wy = (g.p1.y + g.p2.y) / 2;
         const sc = worldToScreen(wx, wy);
@@ -903,14 +958,12 @@
         ctx.save();
         ctx.translate(sc.x, sc.y);
 
-        // Blinking hazard circle
         const flash = Math.floor(Date.now() / 250) % 2 === 0;
         ctx.fillStyle = flash ? 'rgba(239, 68, 68, 0.4)' : 'rgba(234, 179, 8, 0.4)';
         ctx.beginPath();
         ctx.arc(0, 0, 16 * view.scale, 0, Math.PI * 2);
         ctx.fill();
 
-        // 2 Crashed Cars collided at an angle
         ctx.fillStyle = '#f97316';
         ctx.save();
         ctx.rotate(0.4);
@@ -923,7 +976,6 @@
         ctx.fillRect(-4 * view.scale, -2 * view.scale, 9 * view.scale, 5 * view.scale);
         ctx.restore();
 
-        // Hazard Barrier stripes
         ctx.fillStyle = '#eab308';
         ctx.fillRect(-12 * view.scale, -8 * view.scale, 24 * view.scale, 3 * view.scale);
         ctx.fillStyle = '#000000';
@@ -931,7 +983,6 @@
           ctx.fillRect(i * view.scale, -8 * view.scale, 3 * view.scale, 3 * view.scale);
         }
 
-        // Floating Incident Marker
         ctx.font = `bold ${9 * view.scale}px sans-serif`;
         ctx.fillStyle = '#ef4444';
         ctx.textAlign = 'center';
@@ -940,7 +991,7 @@
         ctx.restore();
       });
 
-      // 4. Draw 2D Realistic Vehicles (Cars NEVER turn red! Proportional sizes!)
+      // 4. Draw 2D Vehicles
       if (simState?.vehicles) {
         simState.vehicles.forEach(v => {
           const road = v.road;
@@ -974,24 +1025,20 @@
           const carW = 4.8 * view.scale;
           const carL = 8.5 * view.scale;
 
-          // Body
           ctx.fillStyle = vehColor;
           ctx.beginPath();
           ctx.roundRect(-carW/2, -carL/2, carW, carL, 2);
           ctx.fill();
 
-          // Windshield
           ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
           ctx.fillRect(-carW/2 + 0.8, -carL/4, carW - 1.6, carL/3.2);
 
-          // Front Headlights
           if (!isBraking) {
             ctx.fillStyle = '#fef08a';
             ctx.fillRect(-carW/2 + 0.5, -carL/2, 1.2, 1.2);
             ctx.fillRect(carW/2 - 1.7, -carL/2, 1.2, 1.2);
           }
 
-          // Rear Brake Lights
           ctx.fillStyle = isBraking ? '#ff1111' : '#660000';
           ctx.fillRect(-carW/2 + 0.5, carL/2 - 1, 1.3, 1);
           ctx.fillRect(carW/2 - 1.8, carL/2 - 1, 1.3, 1);
@@ -1000,7 +1047,7 @@
         });
       }
 
-      // 5. Draw Dedicated Ambulance when Active
+      // 5. Draw Ambulance when Active
       if (amb && amb.active && amb.current_road) {
         const g = roadGeom[amb.current_road];
         if (g) {
@@ -1023,7 +1070,6 @@
           const ambW = 6.0 * view.scale;
           const ambL = 12.0 * view.scale;
 
-          // Pure White Body
           ctx.fillStyle = '#ffffff';
           ctx.shadowColor = '#38bdf8';
           ctx.shadowBlur = 10;
@@ -1032,16 +1078,13 @@
           ctx.fill();
           ctx.shadowBlur = 0;
 
-          // Windshield
           ctx.fillStyle = '#0f172a';
           ctx.fillRect(-ambW/2 + 1, -ambL/4, ambW - 2, ambL/3.5);
 
-          // Red Medical Cross
           ctx.fillStyle = '#dc2626';
           ctx.fillRect(-1 * view.scale, 0, 2 * view.scale, 4 * view.scale);
           ctx.fillRect(-2 * view.scale, 1 * view.scale, 4 * view.scale, 2 * view.scale);
 
-          // Flashing Blue & Red Emergency Strobe Beacons
           const flash = Math.floor(Date.now() / 150) % 2 === 0;
           ctx.fillStyle = flash ? '#ef4444' : '#38bdf8';
           ctx.shadowColor = ctx.fillStyle;
@@ -1055,7 +1098,6 @@
 
           ctx.restore();
 
-          // Floating Ambulance Badge
           ctx.font = `bold ${9 * view.scale}px sans-serif`;
           ctx.fillStyle = '#ef4444';
           ctx.textAlign = 'center';
@@ -1064,42 +1106,48 @@
       }
     }
 
-    // ── Telemetry Polling ──
+    // ── Flicker-Free Telemetry Updating (Direct DOM mutation) ──
     async function updateTelemetry() {
       try {
         const res = await fetch('/api/state');
         simState = await res.json();
 
+        // Top HUD updates
         document.getElementById('metric-step').textContent = simState.step;
         document.getElementById('metric-veh').textContent = simState.total_vehicles;
         document.getElementById('metric-waiting').textContent = simState.total_waiting;
         document.getElementById('metric-speed').textContent = `${simState.avg_speed} km/h`;
         document.getElementById('metric-travel').textContent = `${simState.avg_travel_time}s`;
 
-        // Toggle corridor banner
-        const isAmbulanceActive = simState.ambulance && simState.ambulance.active;
-        document.getElementById('corridor-banner').classList.toggle('active', isAmbulanceActive);
+        // Ambulance banner
+        const isAmb = simState.ambulance && simState.ambulance.active;
+        document.getElementById('corridor-banner').classList.toggle('active', isAmb);
 
-        // Sync Incident Button State
-        const hasIncidents = simState.active_incidents && simState.active_incidents.length > 0;
-        incidentActive = hasIncidents;
+        // Accident button state
+        const hasInc = simState.active_incidents && simState.active_incidents.length > 0;
+        isIncidentActive = hasInc;
         const incBtn = document.getElementById('btn-incident-toggle');
-        if (hasIncidents) {
-          incBtn.textContent = '🚨 Clear Accident (J3)';
-          incBtn.className = 'btn btn-active-incident';
+        if (hasInc) {
+          if (incBtn.textContent !== '🚨 Clear Accident (J3)') {
+            incBtn.textContent = '🚨 Clear Accident (J3)';
+            incBtn.className = 'btn btn-active-incident';
+          }
         } else {
-          incBtn.textContent = '⚠️ Inject Accident (J3)';
-          incBtn.className = 'btn btn-amber';
+          if (incBtn.textContent !== '⚠️ Inject Accident (J3)') {
+            incBtn.textContent = '⚠️ Inject Accident (J3)';
+            incBtn.className = 'btn btn-amber';
+          }
         }
 
-        syncNodeDrawer();
-        syncModalDashboard();
-        render();
+        // Sync node drawer values without recreating innerHTML
+        updateNodeDrawerValues();
+
+        // Sync dashboard grid values without recreating innerHTML
+        updateDashboardGridValues();
       } catch (err) {}
     }
 
-    function syncNodeDrawer() {
-      const drawer = document.getElementById('node-drawer');
+    function updateNodeDrawerValues() {
       if (!selectedJunction || !simState?.agents?.[selectedJunction]) return;
 
       const ag = simState.agents[selectedJunction];
@@ -1108,62 +1156,65 @@
       document.getElementById('drw-phase-time').textContent = `Hold: ${ag.steps_on_phase}s / Dynamic Max: ${ag.allocated_green}s`;
 
       const ind = document.getElementById('drw-sig-indicator');
-      ind.className = 'signal-indicator ' + (ag.is_yellow ? 'sig-yellow' : ag.current_phase === 'EW' ? 'sig-green' : 'sig-green');
+      ind.className = 'signal-indicator ' + (ag.is_yellow ? 'sig-yellow' : 'sig-green');
 
-      const list = document.getElementById('drw-dir-list');
       const obs = ag.local_obs || {};
-      let html = '';
+      ['EW', 'NS'].forEach(dir => {
+        const d = obs[dir] || { density: 0, queue_length: 0, average_speed: 0, congestion_score: 0, waiting_time: 0, status: 'LOW' };
+        const statusCol = d.status === 'HIGH' ? '#ef4444' : d.status === 'MEDIUM' ? '#eab308' : '#22c55e';
 
-      for (const [dName, d] of Object.entries(obs)) {
-        const statusClass = d.status === 'HIGH' ? '#ef4444' : d.status === 'MEDIUM' ? '#eab308' : '#22c55e';
-        html += `
-          <div class="dir-card">
-            <div class="dir-card-head">
-              <span>${dName} Approach</span>
-              <span style="color:${statusClass}">${d.status} (${Math.round(d.density * 100)}%)</span>
-            </div>
-            <div class="dir-bar-track">
-              <div class="dir-bar-fill" style="width:${d.density * 100}%; background:${statusClass};"></div>
-            </div>
-            <div class="dir-stats">
-              <div><span>Queue</span><b>${d.queue_length}</b></div>
-              <div><span>Speed</span><b>${d.average_speed}</b></div>
-              <div><span>Score</span><b>${d.congestion_score}</b></div>
-              <div><span>Wait</span><b>${d.waiting_time}s</b></div>
-            </div>
-          </div>
-        `;
-      }
-      list.innerHTML = html;
+        const stEl = document.getElementById(`dir-${dir}-status`);
+        if (stEl) {
+          stEl.textContent = `${d.status} (${Math.round(d.density * 100)}%)`;
+          stEl.style.color = statusCol;
+        }
+
+        const barEl = document.getElementById(`dir-${dir}-bar`);
+        if (barEl) {
+          barEl.style.width = `${d.density * 100}%`;
+          barEl.style.background = statusCol;
+        }
+
+        const qEl = document.getElementById(`dir-${dir}-queue`);
+        if (qEl) qEl.textContent = d.queue_length;
+
+        const spEl = document.getElementById(`dir-${dir}-speed`);
+        if (spEl) spEl.textContent = d.average_speed;
+
+        const scEl = document.getElementById(`dir-${dir}-score`);
+        if (scEl) scEl.textContent = d.congestion_score;
+
+        const wEl = document.getElementById(`dir-${dir}-wait`);
+        if (wEl) wEl.textContent = `${d.waiting_time}s`;
+      });
+
       document.getElementById('drw-ai-reasoning').textContent = ag.decision_reason || 'Observing traffic flow...';
     }
 
-    function syncModalDashboard() {
+    function updateDashboardGridValues() {
       if (!simState?.agents) return;
 
-      const grid = document.getElementById('modal-agent-grid');
-      let html = '';
       for (const [jid, ag] of Object.entries(simState.agents)) {
-        const phCol = ag.current_phase === 'EW' ? '#22c55e' : '#38bdf8';
-        html += `
-          <div class="agent-summary-card" onclick="selectAndClose('${jid}')">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-              <span style="font-weight:700; font-size:14px;">${jid}</span>
-              <span style="font-size:10px; font-weight:700; color:${phCol};">${ag.current_phase}</span>
-            </div>
-            <div style="font-size:11px; color:var(--text-muted); display:flex; flex-direction:column; gap:3px;">
-              <div>Density: <b style="color:#fff;">${Math.round(ag.overall_density * 100)}%</b></div>
-              <div>Queued: <b style="color:#fff;">${ag.total_queue} cars</b></div>
-              <div>Downstream Cap: <b style="color:#22c55e;">${Math.round(ag.available_capacity * 100)}%</b></div>
-            </div>
-          </div>
-        `;
-      }
-      grid.innerHTML = html;
+        const phEl = document.getElementById(`ag-phase-${jid}`);
+        if (phEl) {
+          phEl.textContent = ag.current_phase;
+          phEl.style.color = ag.current_phase === 'EW' ? '#22c55e' : '#38bdf8';
+        }
 
+        const densEl = document.getElementById(`ag-dens-${jid}`);
+        if (densEl) densEl.textContent = `${Math.round(ag.overall_density * 100)}%`;
+
+        const qEl = document.getElementById(`ag-queue-${jid}`);
+        if (qEl) qEl.textContent = `${ag.total_queue} cars`;
+
+        const capEl = document.getElementById(`ag-cap-${jid}`);
+        if (capEl) capEl.textContent = `${Math.round(ag.available_capacity * 100)}%`;
+      }
+
+      // Update message feed
       const msgBox = document.getElementById('modal-msg-stream');
       const msgs = simState.agent_messages || [];
-      msgBox.innerHTML = msgs.slice(-10).map(m => `
+      msgBox.innerHTML = msgs.slice(-8).map(m => `
         <div class="msg-line">
           <span class="sender">[${m.sender}]</span>
           <span>(Step ${m.timestamp}):</span>
@@ -1176,7 +1227,7 @@
       selectedJunction = jid;
       document.getElementById('node-drawer').classList.add('active');
       document.getElementById('dash-modal').classList.remove('active');
-      syncNodeDrawer();
+      updateNodeDrawerValues();
     }
 
     // ── Mouse & Pan/Zoom Handlers ──
@@ -1192,7 +1243,6 @@
       if (view.isDragging) {
         view.x = e.clientX - view.startX;
         view.y = e.clientY - view.startY;
-        render();
       }
     });
 
@@ -1206,7 +1256,6 @@
       view.scale = Math.min(Math.max(view.scale * zoomFactor, 0.4), 4.0);
       view.x = e.clientX - mouseWorld.x * view.scale;
       view.y = e.clientY - (600 - mouseWorld.y) * view.scale;
-      render();
     });
 
     container.addEventListener('click', e => {
@@ -1218,21 +1267,22 @@
         if (Math.sqrt(dx*dx + dy*dy) < 30) {
           selectedJunction = jid;
           document.getElementById('node-drawer').classList.add('active');
-          syncNodeDrawer();
-          render();
+          updateNodeDrawerValues();
           return;
         }
       }
     });
 
-    // ── UI Controls ──
+    // ── Instant UI Actions & API Calls ──
     async function apiCall(endpoint, payload) {
-      await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      updateTelemetry();
+      try {
+        await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        updateTelemetry();
+      } catch (err) {}
     }
 
     document.getElementById('btn-start').onclick = () => apiCall('/api/control', { cmd: 'start' });
@@ -1248,9 +1298,12 @@
       apiCall('/api/control', { cmd: 'speed', value: delay });
     };
 
+    // Instant Responsive Accident Toggle
     document.getElementById('btn-incident-toggle').onclick = function() {
-      const willBeActive = !incidentActive;
-      apiCall('/api/incident', { junction: 'J3', road: 'road_J3_J2', type: 'ACCIDENT', active: willBeActive });
+      isIncidentActive = !isIncidentActive;
+      this.textContent = isIncidentActive ? '🚨 Clear Accident (J3)' : '⚠️ Inject Accident (J3)';
+      this.className = isIncidentActive ? 'btn btn-active-incident' : 'btn btn-amber';
+      apiCall('/api/incident', { junction: 'J3', road: 'road_J3_J2', type: 'ACCIDENT', active: isIncidentActive });
     };
 
     document.getElementById('btn-ambulance-dispatch').onclick = function() {
@@ -1264,17 +1317,18 @@
       apiCall('/api/override', { junction: selectedJunction, phase: 1 });
     };
 
-    document.getElementById('btn-zoom-in').onclick = () => { view.scale *= 1.2; render(); };
-    document.getElementById('btn-zoom-out').onclick = () => { view.scale *= 0.8; render(); };
-    document.getElementById('btn-recenter').onclick = () => { centerView(); render(); };
+    document.getElementById('btn-zoom-in').onclick = () => { view.scale *= 1.2; };
+    document.getElementById('btn-zoom-out').onclick = () => { view.scale *= 0.8; };
+    document.getElementById('btn-recenter').onclick = () => { centerView(); };
 
     document.getElementById('drw-close').onclick = () => {
       document.getElementById('node-drawer').classList.remove('active');
     };
 
+    // Instant Responsive Dashboard Modal
     document.getElementById('btn-open-dash').onclick = () => {
       document.getElementById('dash-modal').classList.add('active');
-      syncModalDashboard();
+      updateDashboardGridValues();
     };
     document.getElementById('modal-close').onclick = () => {
       document.getElementById('dash-modal').classList.remove('active');
@@ -1288,14 +1342,21 @@
       } else if (e.code === 'KeyR') {
         apiCall('/api/control', { cmd: 'reset' });
       } else if (e.code === 'KeyC') {
-        centerView(); render();
+        centerView();
       }
     });
+
+    // ── Animation Loop (60 FPS) & Telemetry Poller (200ms) ──
+    function loop() {
+      render();
+      requestAnimationFrame(loop);
+    }
 
     (async () => {
       await loadRoadnet();
       await updateTelemetry();
-      setInterval(updateTelemetry, 180);
+      setInterval(updateTelemetry, 200);
+      requestAnimationFrame(loop);
     })();
   </script>
 </body>
